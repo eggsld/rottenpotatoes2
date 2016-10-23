@@ -1,5 +1,5 @@
 class MoviesController < ApplicationController
-
+  
   def movie_params
     params.require(:movie).permit(:title, :rating, :description, :release_date)
   end
@@ -9,9 +9,41 @@ class MoviesController < ApplicationController
     @movie = Movie.find(id) # look up movie by unique ID
     # will render app/views/movies/show.<extension> by default
   end
-
   def index
-    @movies = Movie.all
+    @all_ratings = Movie.all_ratings
+    #session.clear
+    sort = params[:sort]||session[:sort]
+    
+    case sort
+    when 'title'
+      @title_header = 'hilight'
+    
+    when 'release_date'
+      @release_date_header = 'hilight'
+    end
+    
+    @current_ratings = params[:ratings] || session[:ratings] || {}
+    
+    # In the case that no ratings are selected, display all
+    if @current_ratings == {}
+      @current_ratings = Hash[@all_ratings.map{|rating| [rating,rating]}]
+    end
+    
+    # if the session and current sorting criteria are diffrent
+    if session[:sort] != params[:sort]
+      session[:sort] = params[:sort]
+      flash.keep
+      redirect_to :sort => sort ,:ratings => @current_ratings and return
+    end
+    
+    if params[:ratings] != session[:ratings] and @current_ratings != {}
+      session[:sort] = sort
+      session[:ratings] = @current_ratings
+      flash.keep
+      redirect_to :sort => sort, :ratings => @current_ratings and return
+    end
+
+    @movies = Movie.where(rating: @current_ratings.keys).order(sort)
   end
 
   def new
@@ -34,7 +66,8 @@ class MoviesController < ApplicationController
     flash[:notice] = "#{@movie.title} was successfully updated."
     redirect_to movie_path(@movie)
   end
-
+  
+    
   def destroy
     @movie = Movie.find(params[:id])
     @movie.destroy
